@@ -1,8 +1,11 @@
 # System Modules
 import math
+from dataclasses import dataclass, field
 
 # Installed Modules
 # - None
+
+_UNIT_MULTIPLIERS = {"m": 1, "cm": 10_000, "mm": 1_000_000}
 
 
 def area_of_circle(radius):
@@ -10,6 +13,11 @@ def area_of_circle(radius):
     if radius < 0:
         raise ValueError("Radius cannot be negative")
     return math.pi * radius ** 2
+
+
+def area_of_circle_in_unit(radius, unit="m"):
+    """Calculate circle area converted to the given unit (m, cm, or mm)."""
+    return area_of_circle(radius) * _UNIT_MULTIPLIERS.get(unit, 1)
 
 
 def get_nth_fibonacci(n):
@@ -27,76 +35,15 @@ def get_nth_fibonacci(n):
         return b
 
 
-# --- Duplicated Code: as três funções abaixo repetem a mesma lógica ---
-def area_of_circle_meters(radius):
-    if radius < 0:
-        raise ValueError("Radius cannot be negative")
-    return 3.14159 * radius * radius
-
-
-def area_of_circle_cm(radius):
-    if radius < 0:
-        raise ValueError("Radius cannot be negative")
-    return 3.14159 * radius * radius * 10000
-
-
-def area_of_circle_mm(radius):
-    if radius < 0:
-        raise ValueError("Radius cannot be negative")
-    return 3.14159 * radius * radius * 1000000
-
-
-class Geometry:
-    """Large Class: faz cálculos, formatação, relatório e e-mail ao mesmo tempo."""
-
-    def __init__(self, name, owner, owner_email, owner_phone, owner_address):
-        self.name = name
-        # Data Clumps: dono sempre representado por estes 4 campos juntos
-        self.owner = owner
-        self.owner_email = owner_email
-        self.owner_phone = owner_phone
-        self.owner_address = owner_address
-        self.shapes = []
-
-    # Long Method + Long Parameter List + Magic Numbers
-    def process_shape(self, shape_type, a, b, c, d, e, unit, scale, precision,
-                      should_print, should_round, should_validate, tax_rate):
-        result = 0
-        if should_validate:
-            if a < 0 or b < 0 or c < 0 or d < 0 or e < 0:
-                raise ValueError("No negatives allowed")
-        if shape_type == "circle":
-            result = 3.14159 * a * a
-        elif shape_type == "rectangle":
-            result = a * b
-        elif shape_type == "triangle":
-            result = (a * b) / 2
-        elif shape_type == "trapezoid":
-            result = ((a + b) / 2) * c
-        elif shape_type == "box":
-            result = a * b * c
-        elif shape_type == "weird":
-            result = a + b + c + d + e
-        else:
-            result = 0
-        if unit == "cm":
-            result = result * 10000
-        elif unit == "mm":
-            result = result * 1000000
-        result = result * scale
-        result = result + (result * tax_rate / 100)
-        if should_round:
-            result = round(result, precision)
-        if should_print:
-            print("Resultado calculado: " + str(result))
-        self.shapes.append(result)
-        return result
-
-    # Feature Envy: mexe quase só nos dados de Owner, não nos próprios
-    def build_owner_label(self, owner):
-        return (owner.first_name + " " + owner.last_name + " <" +
-                owner.email + "> tel: " + owner.phone + " - " +
-                owner.address + ", " + owner.city + "/" + owner.state)
+@dataclass
+class ShapeOptions:
+    unit: str = "m"
+    scale: float = 1
+    precision: int = 2
+    should_print: bool = False
+    should_round: bool = True
+    should_validate: bool = True
+    tax_rate: float = 0
 
 
 class Owner:
@@ -108,3 +55,51 @@ class Owner:
         self.address = address
         self.city = city
         self.state = state
+
+    def label(self):
+        return (
+            f"{self.first_name} {self.last_name} <{self.email}>"
+            f" tel: {self.phone} - {self.address}, {self.city}/{self.state}"
+        )
+
+
+class Geometry:
+    def __init__(self, name, owner):
+        self.name = name
+        self.owner = owner
+        self.shapes = []
+
+    def _compute_shape(self, shape_type, a, b, c, d, e):
+        if shape_type == "circle":
+            return math.pi * a * a
+        if shape_type == "rectangle":
+            return a * b
+        if shape_type == "triangle":
+            return (a * b) / 2
+        if shape_type == "trapezoid":
+            return ((a + b) / 2) * c
+        if shape_type == "box":
+            return a * b * c
+        if shape_type == "weird":
+            return a + b + c + d + e
+        return 0
+
+    def process_shape(self, shape_type, a, b, c, d, e, options=None):
+        if options is None:
+            options = ShapeOptions()
+
+        if options.should_validate and any(v < 0 for v in (a, b, c, d, e)):
+            raise ValueError("No negatives allowed")
+
+        result = self._compute_shape(shape_type, a, b, c, d, e)
+        result *= _UNIT_MULTIPLIERS.get(options.unit, 1)
+        result *= options.scale
+        result += result * options.tax_rate / 100
+
+        if options.should_round:
+            result = round(result, options.precision)
+        if options.should_print:
+            print("Resultado calculado: " + str(result))
+
+        self.shapes.append(result)
+        return result

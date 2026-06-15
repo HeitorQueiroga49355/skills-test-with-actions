@@ -1,6 +1,7 @@
 # System Modules
 import sys
 import os
+import math
 
 # Installed Modules
 import pytest
@@ -9,10 +10,9 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 from calculations import (   # noqa: E402
     area_of_circle,
+    area_of_circle_in_unit,
     get_nth_fibonacci,
-    area_of_circle_meters,
-    area_of_circle_cm,
-    area_of_circle_mm,
+    ShapeOptions,
     Geometry,
     Owner,
 )
@@ -27,7 +27,7 @@ def test_area_of_circle_positive_radius():
     result = area_of_circle(radius)
 
     # Assert
-    assert abs(result - 3.14159) < 1e-5
+    assert abs(result - math.pi) < 1e-10
 
 
 def test_area_of_circle_zero_radius():
@@ -77,15 +77,15 @@ def test_get_nth_fibonacci_one():
 
 
 def test_get_nth_fibonacci_ten():
-   """Test with n=10."""
-   # Arrange
-   n = 10
+    """Test with n=10."""
+    # Arrange
+    n = 10
 
-   # Act
-   result = get_nth_fibonacci(n)
+    # Act
+    result = get_nth_fibonacci(n)
 
-   # Assert
-   assert result == 55
+    # Assert
+    assert result == 55
 
 
 def test_get_nth_fibonacci_negative():
@@ -98,81 +98,67 @@ def test_get_nth_fibonacci_negative():
         get_nth_fibonacci(n)
 
 
-def test_area_of_circle_meters():
+def test_area_of_circle_in_unit_meters():
     """Test area in square meters."""
     # Arrange
     radius = 2
 
     # Act
-    result = area_of_circle_meters(radius)
+    result = area_of_circle_in_unit(radius, "m")
 
     # Assert
-    assert abs(result - (3.14159 * 4)) < 1e-5
+    assert abs(result - math.pi * 4) < 1e-10
 
 
-def test_area_of_circle_cm():
+def test_area_of_circle_in_unit_cm():
     """Test area converted to square centimeters."""
     # Arrange
     radius = 2
 
     # Act
-    result = area_of_circle_cm(radius)
+    result = area_of_circle_in_unit(radius, "cm")
 
     # Assert
-    assert abs(result - (3.14159 * 4 * 10000)) < 1e-2
+    assert abs(result - math.pi * 4 * 10_000) < 1e-5
 
 
-def test_area_of_circle_mm():
+def test_area_of_circle_in_unit_mm():
     """Test area converted to square millimeters."""
     # Arrange
     radius = 2
 
     # Act
-    result = area_of_circle_mm(radius)
+    result = area_of_circle_in_unit(radius, "mm")
 
     # Assert
-    assert abs(result - (3.14159 * 4 * 1000000)) < 1
+    assert abs(result - math.pi * 4 * 1_000_000) < 1
 
 
-def test_area_of_circle_meters_negative():
-    """Test that a negative radius raises an error."""
+def test_area_of_circle_in_unit_negative():
+    """Test that a negative radius raises an error for any unit."""
     # Arrange
     radius = -1
 
     # Act & Assert
     with pytest.raises(ValueError, match="Radius cannot be negative"):
-        area_of_circle_meters(radius)
+        area_of_circle_in_unit(radius, "cm")
 
 
-def test_area_of_circle_cm_negative():
-    """Test that a negative radius raises an error in cm."""
-    # Arrange
-    radius = -1
-
-    # Act & Assert
-    with pytest.raises(ValueError, match="Radius cannot be negative"):
-        area_of_circle_cm(radius)
-
-
-def test_area_of_circle_mm_negative():
-    """Test that a negative radius raises an error in mm."""
-    # Arrange
-    radius = -1
-
-    # Act & Assert
-    with pytest.raises(ValueError, match="Radius cannot be negative"):
-        area_of_circle_mm(radius)
+def _make_owner():
+    return Owner(
+        first_name="João",
+        last_name="Silva",
+        email="joao@example.com",
+        phone="99999-9999",
+        address="Rua A, 123",
+        city="Recife",
+        state="PE",
+    )
 
 
 def _make_geometry():
     """Helper that builds a Geometry instance for the tests."""
-    return Geometry(
-        name="figuras",
-        owner="João",
-        owner_email="joao@example.com",
-        owner_phone="99999-9999",
-        owner_address="Rua A, 123",
-    )
+    return Geometry(name="figuras", owner=_make_owner())
 
 
 def test_geometry_process_shape_rectangle():
@@ -183,9 +169,9 @@ def test_geometry_process_shape_rectangle():
     # Act
     result = geometry.process_shape(
         "rectangle", 2, 3, 0, 0, 0,
-        unit="m", scale=1, precision=2,
-        should_print=False, should_round=True,
-        should_validate=True, tax_rate=0,
+        options=ShapeOptions(unit="m", scale=1, precision=2,
+                             should_print=False, should_round=True,
+                             should_validate=True, tax_rate=0),
     )
 
     # Assert
@@ -201,13 +187,13 @@ def test_geometry_process_shape_circle_with_unit_and_tax():
     # Act
     result = geometry.process_shape(
         "circle", 1, 0, 0, 0, 0,
-        unit="cm", scale=1, precision=4,
-        should_print=False, should_round=True,
-        should_validate=True, tax_rate=10,
+        options=ShapeOptions(unit="cm", scale=1, precision=4,
+                             should_print=False, should_round=True,
+                             should_validate=True, tax_rate=10),
     )
 
     # Assert
-    expected = round(3.14159 * 10000 * 1.10, 4)
+    expected = round(math.pi * 10_000 * 1.10, 4)
     assert result == expected
 
 
@@ -220,9 +206,9 @@ def test_geometry_process_shape_validation_error():
     with pytest.raises(ValueError, match="No negatives allowed"):
         geometry.process_shape(
             "rectangle", -1, 3, 0, 0, 0,
-            unit="m", scale=1, precision=2,
-            should_print=False, should_round=False,
-            should_validate=True, tax_rate=0,
+            options=ShapeOptions(unit="m", scale=1, precision=2,
+                                 should_print=False, should_round=False,
+                                 should_validate=True, tax_rate=0),
         )
 
 
@@ -234,9 +220,9 @@ def test_geometry_process_shape_triangle():
     # Act
     result = geometry.process_shape(
         "triangle", 4, 3, 0, 0, 0,
-        unit="m", scale=1, precision=2,
-        should_print=False, should_round=True,
-        should_validate=False, tax_rate=0,
+        options=ShapeOptions(unit="m", scale=1, precision=2,
+                             should_print=False, should_round=True,
+                             should_validate=False, tax_rate=0),
     )
 
     # Assert
@@ -251,9 +237,9 @@ def test_geometry_process_shape_trapezoid():
     # Act
     result = geometry.process_shape(
         "trapezoid", 2, 4, 5, 0, 0,
-        unit="m", scale=1, precision=2,
-        should_print=False, should_round=True,
-        should_validate=False, tax_rate=0,
+        options=ShapeOptions(unit="m", scale=1, precision=2,
+                             should_print=False, should_round=True,
+                             should_validate=False, tax_rate=0),
     )
 
     # Assert
@@ -268,9 +254,9 @@ def test_geometry_process_shape_box():
     # Act
     result = geometry.process_shape(
         "box", 2, 3, 4, 0, 0,
-        unit="m", scale=1, precision=2,
-        should_print=False, should_round=True,
-        should_validate=False, tax_rate=0,
+        options=ShapeOptions(unit="m", scale=1, precision=2,
+                             should_print=False, should_round=True,
+                             should_validate=False, tax_rate=0),
     )
 
     # Assert
@@ -285,13 +271,13 @@ def test_geometry_process_shape_weird_with_mm_unit():
     # Act
     result = geometry.process_shape(
         "weird", 1, 2, 3, 4, 5,
-        unit="mm", scale=1, precision=2,
-        should_print=False, should_round=True,
-        should_validate=False, tax_rate=0,
+        options=ShapeOptions(unit="mm", scale=1, precision=2,
+                             should_print=False, should_round=True,
+                             should_validate=False, tax_rate=0),
     )
 
     # Assert
-    assert result == 15 * 1000000
+    assert result == 15 * 1_000_000
 
 
 def test_geometry_process_shape_unknown_with_print(capsys):
@@ -302,9 +288,9 @@ def test_geometry_process_shape_unknown_with_print(capsys):
     # Act
     result = geometry.process_shape(
         "unknown", 1, 2, 3, 4, 5,
-        unit="m", scale=1, precision=2,
-        should_print=True, should_round=True,
-        should_validate=False, tax_rate=0,
+        options=ShapeOptions(unit="m", scale=1, precision=2,
+                             should_print=True, should_round=True,
+                             should_validate=False, tax_rate=0),
     )
 
     # Assert
@@ -312,10 +298,9 @@ def test_geometry_process_shape_unknown_with_print(capsys):
     assert "Resultado calculado: 0" in capsys.readouterr().out
 
 
-def test_geometry_build_owner_label():
-    """build_owner_label should format an owner's full label."""
+def test_owner_label():
+    """Owner.label() should format the owner's full label."""
     # Arrange
-    geometry = _make_geometry()
     owner = Owner(
         first_name="Maria",
         last_name="Silva",
@@ -327,7 +312,7 @@ def test_geometry_build_owner_label():
     )
 
     # Act
-    label = geometry.build_owner_label(owner)
+    label = owner.label()
 
     # Assert
     assert label == (
