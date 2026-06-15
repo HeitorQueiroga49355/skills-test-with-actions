@@ -82,9 +82,11 @@ jobs:
 
       - name: Comentar a análise no Pull Request
         uses: actions/github-script@v7
+        env:
+          AI_RESPONSE: ${{ steps.ai.outputs.response }}
         with:
           script: |
-            const response = `${{ steps.ai.outputs.response }}`;
+            const response = process.env.AI_RESPONSE;
             const body = [
               '## 🔍 Análise de Code Smells (IA)',
               '',
