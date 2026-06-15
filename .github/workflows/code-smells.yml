@@ -1,0 +1,101 @@
+# Detecção de Code Smells com IA
+# Analisa as mudanças de cada Pull Request usando um modelo de IA (GitHub Models)
+# e publica um comentário apontando code smells encontrados no código.
+
+name: Code Smells (AI)
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read        # ler o código do repositório
+  models: read          # usar GitHub Models (actions/ai-inference)
+  pull-requests: write  # publicar o comentário com a análise
+
+jobs:
+  detect-code-smells:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # necessário para calcular o diff com a branch base
+
+      - name: Gerar o diff do Pull Request
+        id: diff
+        run: |
+          git diff --unified=3 \
+            "origin/${{ github.base_ref }}...origin/${{ github.head_ref }}" \
+            -- '*.py' > pr_diff.txt || true
+
+          # Se o diff estiver vazio (ou não houver .py), analisa os arquivos .py do projeto
+          if [ ! -s pr_diff.txt ]; then
+            echo "Nenhuma alteração em arquivos .py detectada no diff; analisando os fontes."
+            find . -name '*.py' -not -path './.github/*' -print0 \
+              | xargs -0 -I{} sh -c 'echo "===== {} ====="; cat "{}"' > pr_diff.txt
+          fi
+
+      - name: Montar o prompt de análise
+        run: |
+          cat > prompt.txt <<'PROMPT'
+          Você é um revisor de código sênior especializado em qualidade de software.
+          Sua tarefa é analisar o trecho de código Python abaixo e identificar
+          **code smells** (maus cheiros de código).
+
+          Detecte, no mínimo, os seguintes tipos de code smell quando presentes
+          (mas não se limite a eles):
+          - Long Method (Método Longo): funções com muitas linhas/responsabilidades.
+          - Duplicated Code (Código Duplicado): blocos repetidos ou muito parecidos.
+          - Large Class (Classe Grande): classes com responsabilidades demais.
+          - Feature Envy (Inveja de Recursos): método que usa mais dados de outra
+            classe do que da própria.
+          - Data Clumps (Aglomerados de Dados): grupos de parâmetros/atributos que
+            sempre aparecem juntos.
+          - Long Parameter List (Lista Longa de Parâmetros).
+          - Magic Numbers (Números Mágicos) e nomes pouco descritivos.
+
+          Para CADA code smell encontrado, responda no formato:
+
+          ### <Nome do Code Smell>
+          - **Onde:** arquivo / função / linha aproximada
+          - **Por que é um problema:** explicação curta
+          - **Como refatorar:** sugestão objetiva
+
+          Se NÃO encontrar code smells, responda exatamente:
+          "✅ Nenhum code smell relevante foi detectado neste código."
+
+          Responda em português do Brasil.
+
+          --- CÓDIGO A ANALISAR ---
+          PROMPT
+          cat pr_diff.txt >> prompt.txt
+
+      - name: Analisar code smells com IA
+        id: ai
+        uses: actions/ai-inference@v2.1.1
+        with:
+          prompt-file: prompt.txt
+          model: openai/gpt-4o
+          max-tokens: 1500
+
+      - name: Comentar a análise no Pull Request
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const response = `${{ steps.ai.outputs.response }}`;
+            const body = [
+              '## 🔍 Análise de Code Smells (IA)',
+              '',
+              response,
+              '',
+              '_Análise gerada automaticamente via `actions/ai-inference` (GitHub Models)._'
+            ].join('\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
