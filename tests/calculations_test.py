@@ -144,6 +144,26 @@ def test_area_of_circle_meters_negative():
         area_of_circle_meters(radius)
 
 
+def test_area_of_circle_cm_negative():
+    """Test that a negative radius raises an error in cm."""
+    # Arrange
+    radius = -1
+
+    # Act & Assert
+    with pytest.raises(ValueError, match="Radius cannot be negative"):
+        area_of_circle_cm(radius)
+
+
+def test_area_of_circle_mm_negative():
+    """Test that a negative radius raises an error in mm."""
+    # Arrange
+    radius = -1
+
+    # Act & Assert
+    with pytest.raises(ValueError, match="Radius cannot be negative"):
+        area_of_circle_mm(radius)
+
+
 def _make_geometry():
     """Helper that builds a Geometry instance for the tests."""
     return Geometry(
@@ -204,6 +224,92 @@ def test_geometry_process_shape_validation_error():
             should_print=False, should_round=False,
             should_validate=True, tax_rate=0,
         )
+
+
+def test_geometry_process_shape_triangle():
+    """process_shape should compute a triangle area."""
+    # Arrange
+    geometry = _make_geometry()
+
+    # Act
+    result = geometry.process_shape(
+        "triangle", 4, 3, 0, 0, 0,
+        unit="m", scale=1, precision=2,
+        should_print=False, should_round=True,
+        should_validate=False, tax_rate=0,
+    )
+
+    # Assert
+    assert result == 6
+
+
+def test_geometry_process_shape_trapezoid():
+    """process_shape should compute a trapezoid area."""
+    # Arrange
+    geometry = _make_geometry()
+
+    # Act
+    result = geometry.process_shape(
+        "trapezoid", 2, 4, 5, 0, 0,
+        unit="m", scale=1, precision=2,
+        should_print=False, should_round=True,
+        should_validate=False, tax_rate=0,
+    )
+
+    # Assert
+    assert result == 15
+
+
+def test_geometry_process_shape_box():
+    """process_shape should compute a box volume."""
+    # Arrange
+    geometry = _make_geometry()
+
+    # Act
+    result = geometry.process_shape(
+        "box", 2, 3, 4, 0, 0,
+        unit="m", scale=1, precision=2,
+        should_print=False, should_round=True,
+        should_validate=False, tax_rate=0,
+    )
+
+    # Assert
+    assert result == 24
+
+
+def test_geometry_process_shape_weird_with_mm_unit():
+    """process_shape should sum dimensions and convert to mm."""
+    # Arrange
+    geometry = _make_geometry()
+
+    # Act
+    result = geometry.process_shape(
+        "weird", 1, 2, 3, 4, 5,
+        unit="mm", scale=1, precision=2,
+        should_print=False, should_round=True,
+        should_validate=False, tax_rate=0,
+    )
+
+    # Assert
+    assert result == 15 * 1000000
+
+
+def test_geometry_process_shape_unknown_with_print(capsys):
+    """process_shape should return 0 for unknown shapes and print when asked."""
+    # Arrange
+    geometry = _make_geometry()
+
+    # Act
+    result = geometry.process_shape(
+        "unknown", 1, 2, 3, 4, 5,
+        unit="m", scale=1, precision=2,
+        should_print=True, should_round=True,
+        should_validate=False, tax_rate=0,
+    )
+
+    # Assert
+    assert result == 0
+    assert "Resultado calculado: 0" in capsys.readouterr().out
 
 
 def test_geometry_build_owner_label():
